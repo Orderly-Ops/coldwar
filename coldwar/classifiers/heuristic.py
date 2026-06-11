@@ -59,7 +59,30 @@ OUTREACH_TOOL_FINGERPRINTS = [
     "reply.io",
     "woodpecker",
     "salesloft",
+    "sparkle.io",
+    "thriwin.io",
 ]
+
+# Not every signal means the same thing, so we score them and threshold the sum
+# instead of flagging the instant anything matches:
+#
+#   - An outreach-tool fingerprint is near-certain on its own (real reps don't
+#     send through Instantly/Smartlead/Apollo).
+#   - A booking link OR sales-intent language alone is weak — an internal email
+#     pitching a meeting trips these too. Either one alone stays under threshold.
+#   - A booking link AND sales-intent language together is the classic cold-sales
+#     shape, so the pair clears the bar.
+#
+# Tune these freely; the tests in tests/test_heuristic.py pin the intended
+# behavior (tool => cold, booking+keywords => cold, either alone => not cold).
+WEIGHT_OUTREACH_TOOL = 0.8
+WEIGHT_BOOKING_LINK = 0.35
+WEIGHT_SALES_KEYWORDS = 0.35
+
+# Score at or above this is "cold". 0.6 lets the tool fingerprint (0.8) and the
+# booking+keywords pair (0.70) through, while either weak signal alone (0.35)
+# falls short.
+COLD_THRESHOLD = 0.6
 
 
 @register
@@ -68,6 +91,7 @@ class HeuristicClassifier(BaseClassifier):
 
     def classify(self, message: Message) -> Verdict:
         reasons: list[str] = []
+        score = 0.0
 
         # Gate everything on first contact — replies and known senders are spared.
         if not message.is_first_contact:
@@ -75,29 +99,30 @@ class HeuristicClassifier(BaseClassifier):
 
         haystack = f"{message.subject}\n{message.body_text}".lower()
 
-        # Signal 1: sales-intent keywords.
+        # Signal 1: sales-intent keywords (weak — internal pitches use these too).
         hit_keywords = [kw for kw in SALES_KEYWORDS if kw in haystack]
         if hit_keywords:
+            score += WEIGHT_SALES_KEYWORDS
             preview = ", ".join(hit_keywords[:3])
             reasons.append(f"sales-intent language ({preview})")
 
-        # Signal 2: a calendar / booking link.
+        # Signal 2: a calendar / booking link (weak on its own).
         hit_links = [host for host in BOOKING_LINK_HOSTS if host in haystack]
         if hit_links:
+            score += WEIGHT_BOOKING_LINK
             reasons.append(f"booking link ({hit_links[0]})")
 
-        # Signal 3: outreach-tool fingerprints anywhere in the headers.
+        # Signal 3: outreach-tool fingerprints in the headers (near-certain).
         header_blob = " ".join(str(v) for v in message.headers.values()).lower()
         hit_tools = [t for t in OUTREACH_TOOL_FINGERPRINTS if t in header_blob]
         if hit_tools:
+            score += WEIGHT_OUTREACH_TOOL
             reasons.append(f"outreach-tool fingerprint ({hit_tools[0]})")
 
-        # Decision: first contact + at least one cold signal.
-        is_cold = bool(reasons)
-
-        # Confidence grows with the number of independent signals that fired.
-        # 1 signal -> 0.5, 2 -> 0.75, 3 -> ~0.83 (capped well under certainty).
-        score = round(1 - 0.5 ** len(reasons), 2) if reasons else 0.0
+        # Decision: cold only when the weighted evidence clears the threshold, so
+        # a single weak signal (booking link OR keywords alone) is NOT cold.
+        score = round(min(score, 1.0), 2)
+        is_cold = score >= COLD_THRESHOLD
 
         if is_cold:
             reasons.insert(0, "first contact from this sender")

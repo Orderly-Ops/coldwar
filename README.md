@@ -33,14 +33,48 @@ cp config.yaml.example config.yaml   # pick provider(s) + classifier pipeline
 python run.py
 ```
 
-Open <http://127.0.0.1:8765>, click **Connect** on your mailbox, and complete the
+Open <http://127.0.0.1:8765>. For **Outlook**, click **Connect** and complete the
 **device-code flow**: Cold War shows a short code and a URL; you approve on any
 device. No passwords ever touch Cold War. The worker then checks your inbox on an
 interval and the dashboard shows what it quarantined — and **why**.
 
+**Gmail is different** — see [Connecting Gmail](#connecting-gmail-live-testing)
+below. (Google's device flow can't grant Gmail scopes, so Gmail uses a one-time
+browser consent instead.)
+
 > You need an OAuth client to use a real mailbox: a Google Cloud OAuth client
-> (type "TVs and Limited Input devices", Gmail API enabled) and/or an Entra ID app
-> for Microsoft. The heuristic classifier and tests run with no credentials.
+> (Gmail API enabled) and/or an Entra ID app for Microsoft. The heuristic
+> classifier and tests run with no credentials.
+
+## Connecting Gmail (live testing)
+
+Google's OAuth **device flow only supports a fixed scope list** (email, openid,
+profile, and a couple of Drive/YouTube scopes) — **no Gmail scope**. The
+`gmail.modify` permission Cold War needs to label mail and pull it from the inbox
+can only be granted through the **installed-app / authorization-code flow**. So
+Gmail connects via a one-time browser consent rather than the in-app device code.
+
+**One-time Google Cloud setup:**
+
+1. Pick or create a project at <https://console.cloud.google.com>.
+2. **Enable the Gmail API**: APIs & Services → Library → "Gmail API" → Enable.
+3. **OAuth consent screen**: User type → **Internal** (Workspace only — this means
+   `gmail.modify`, a restricted scope, needs **no Google verification**). Add the
+   `.../auth/gmail.modify` scope.
+4. **Create credentials**: APIs & Services → Credentials → Create Credentials →
+   OAuth client ID → Application type **Desktop app**. Put the client id/secret in
+   `.env` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
+**Mint the token** (opens a browser, then stores the token where the worker reads it):
+
+```bash
+python scripts/get_gmail_token.py --account my-gmail   # id must match config.yaml
+python run.py
+```
+
+`my-gmail` will show **connected** on the dashboard, and the next poll cycle will
+classify your inbox. The script requests offline access, so the saved refresh
+token keeps working — you only consent once.
 
 ## Where do I add my idea? (the contribution map)
 
@@ -77,7 +111,9 @@ Quarantine is provider-specific (Gmail label vs Outlook folder) but hidden behin
 
 ## Status
 
-- **Gmail:** fully implemented (device auth, fetch, label-based quarantine, feedback).
+- **Gmail:** fully implemented (fetch, label-based quarantine, feedback). Auth uses
+  the installed-app flow — see [Connecting Gmail](#connecting-gmail-live-testing) —
+  because Google's device flow can't grant Gmail scopes.
 - **Outlook (Graph):** working **stub** — device auth wired; fetch/move/feedback
   outlined with clear `TODO`s for contributors.
 - **Classifier:** a default [`heuristic`](coldwar/classifiers/heuristic.py) that
