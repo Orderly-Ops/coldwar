@@ -1,0 +1,20 @@
+# Cold War — configuration
+# Copy to `config.yaml` and edit. `config.yaml` is gitignored.
+#
+# This file is the ONLY place you wire plugins. Add a new detector or mailbox by
+# writing one class (in coldwar/classifiers/ or coldwar/providers/) and naming it
+# here — never by editing core wiring.
+
+# Which mailbox accounts to protect. Each account names a provider by its
+# registry name ("gmail", "outlook").
+accounts:
+  - id: my-gmail
+    provider: gmail
+
+  # - id: my-outlook
+  #   provider: outlook
+
+# Detection pipeline. Name a single classifier, or a list to run them in order
+# (the message is cold if any classifier in the pipeline flags it).
+classifier:
+  - heuristic

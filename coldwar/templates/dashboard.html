@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cold War — Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 880px; margin: 3rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { margin-bottom: .25rem; }
+    .tag { display: inline-block; font-size: .75rem; padding: .15rem .5rem; border-radius: 6px; background: #eef; margin-right: .3rem; }
+    .accounts { margin: 1rem 0 2rem; }
+    .account { padding: .5rem .75rem; border: 1px solid #e3e6ea; border-radius: 8px; margin-bottom: .5rem; display: flex; justify-content: space-between; align-items: center; }
+    .ok { color: #047857; } .off { color: #b91c1c; }
+    .msg { border: 1px solid #e3e6ea; border-radius: 10px; padding: 1rem; margin-bottom: .9rem; }
+    .msg .subj { font-weight: 600; }
+    .msg .meta { color: #667; font-size: .85rem; margin: .2rem 0 .5rem; }
+    .reason { display: inline-block; font-size: .78rem; background: #fff4ed; color: #9a3412; border: 1px solid #fed7aa; padding: .12rem .5rem; border-radius: 6px; margin: 0 .3rem .3rem 0; }
+    .score { float: right; font-variant-numeric: tabular-nums; color: #667; }
+    button { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: .4rem .8rem; cursor: pointer; }
+    button:hover { background: #f8fafc; }
+    a.connect { text-decoration: none; background: #1a56db; color: #fff; padding: .35rem .75rem; border-radius: 8px; font-size: .85rem; }
+    .flash { padding: .6rem .9rem; border-radius: 8px; margin-bottom: 1rem; }
+    .flash.ok { background: #ecfdf5; color: #065f46; }
+    .flash.error { background: #fef2f2; color: #991b1b; }
+    .empty { color: #667; padding: 2rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Cold War</h1>
+  <p style="color:#667">Quarantined cold sales mail. Nothing is ever deleted — it's labeled/moved and shown here.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="accounts">
+    <h2>Mailboxes</h2>
+    {% for a in accounts %}
+      <div class="account">
+        <span><strong>{{ a.id }}</strong> <span class="tag">{{ a.provider }}</span>
+          {% if a.connected %}<span class="ok">● connected</span>{% else %}<span class="off">● not connected</span>{% endif %}
+        </span>
+        {% if not a.connected %}
+          <a class="connect" href="{{ url_for('connect', account_id=a.id) }}">Connect</a>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <h2>Quarantined ({{ quarantined|length }})</h2>
+  {% if not quarantined %}
+    <p class="empty">Nothing quarantined yet. The worker checks your inbox on its polling interval.</p>
+  {% endif %}
+
+  {% for m in quarantined %}
+    <div class="msg">
+      <span class="score">score {{ '%.2f'|format(m.score) }}</span>
+      <div class="subj">{{ m.subject or "(no subject)" }}</div>
+      <div class="meta">from {{ m.sender }} · {{ m.account }}</div>
+      <div>
+        {% for r in m.reasons %}<span class="reason">{{ r }}</span>{% endfor %}
+      </div>
+      <form method="post" action="{{ url_for('not_cold') }}" style="margin-top:.6rem">
+        <input type="hidden" name="account" value="{{ m.account }}">
+        <input type="hidden" name="message_id" value="{{ m.message_id }}">
+        <button type="submit">Not cold — restore</button>
+      </form>
+    </div>
+  {% endfor %}
+</body>
+</html>

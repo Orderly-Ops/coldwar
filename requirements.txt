@@ -1,0 +1,13 @@
+# Cold War — runtime dependencies (Python 3.11+)
+Flask>=3.0
+APScheduler>=3.10
+PyYAML>=6.0
+requests>=2.31
+
+# Google / Gmail API
+google-api-python-client>=2.0
+google-auth>=2.0
+google-auth-oauthlib>=1.0
+
+# Dev / test (install with: pip install -r requirements.txt)
+pytest>=8.0

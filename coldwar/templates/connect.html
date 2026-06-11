@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connect {{ account_id }} — Cold War</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1rem; color: #1a1a1a; }
+    .code { font-size: 2.4rem; letter-spacing: .3rem; font-weight: 700; background: #f2f4f7; padding: 1rem 1.5rem; border-radius: 10px; display: inline-block; }
+    a.btn { display: inline-block; margin-top: 1rem; padding: .6rem 1.1rem; background: #1a56db; color: #fff; text-decoration: none; border-radius: 8px; }
+    .muted { color: #667; }
+    #status { margin-top: 1.5rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Connect <code>{{ account_id }}</code></h1>
+  <p class="muted">On any device, open the verification page and enter this code. Cold War never sees your password.</p>
+
+  <p class="code">{{ info.user_code }}</p>
+  <p><a class="btn" href="{{ info.verification_url }}" target="_blank" rel="noopener">Open verification page →</a></p>
+  <p class="muted">{{ info.verification_url }}</p>
+
+  <div id="status">Waiting for you to approve…</div>
+
+  <script>
+    const accountId = {{ account_id | tojson }};
+    const interval = {{ info.interval | default(5) }} * 1000;
+    const statusEl = document.getElementById("status");
+
+    async function poll() {
+      try {
+        const res = await fetch(`/connect/${accountId}/poll`, { method: "POST" });
+        const data = await res.json();
+        if (data.done) {
+          statusEl.textContent = "✅ Connected! Redirecting…";
+          setTimeout(() => (window.location = "/"), 1200);
+          return;
+        }
+        if (data.error) {
+          statusEl.textContent = "⚠️ " + data.error;
+          return;
+        }
+      } catch (e) {
+        statusEl.textContent = "⚠️ " + e;
+      }
+      setTimeout(poll, interval);
+    }
+    setTimeout(poll, interval);
+  </script>
+</body>
+</html>
